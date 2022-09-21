@@ -40,7 +40,12 @@ import { withAITracking } from '@microsoft/applicationinsights-react-js';
 import { appInsights, reactPlugin } from '../utilities/telemetryClient';
 import copyToClipboard from 'copy-to-clipboard';
 import boardDataService from '../dal/boardDataService';
-import classNames from 'classnames';
+
+import { BarStackHorizontal } from '@visx/shape';
+import { Group } from '@visx/group';
+import { AxisBottom, AxisLeft } from '@visx/axis';
+import { LegendOrdinal } from '@visx/legend';
+import { scaleBand, scaleLinear, scaleOrdinal } from '@visx/scale';
 
 export interface FeedbackBoardContainerProps {
   isHostedAzureDevOps: boolean;
@@ -985,8 +990,6 @@ class FeedbackBoardContainer extends React.Component<FeedbackBoardContainerProps
     // TODO (enpolat) : appInsightsClient.trackEvent(TelemetryEvents.FeedbackBoardMetadataUpdated);
   }
 
-  // If an action needs to be hidden on desktop or mobile view, use the item's className property
-  // with .hide-mobile or .hide-desktop
   private readonly boardActionContexualMenuItems: IContextualMenuItem[] = [
     {
       key: 'createBoard',
@@ -1593,78 +1596,85 @@ class FeedbackBoardContainer extends React.Component<FeedbackBoardContainerProps
                   <div>
                     Assessment with favorability percentages and average score <br />
                     ({teamEffectivenessResponseCount} {teamEffectivenessResponseCount == 1 ? 'person' : 'people'} responded)
-                    <div className="retro-summary-effectiveness-scores">
-                      <ul className="chart">
-                        {this.state.effectivenessMeasurementChartData.map((data, index) => {
-                          const averageScore = this.state.effectivenessMeasurementSummary[index]?.average;
-                          const greenScore = (data.green * 100) / teamEffectivenessResponseCount;
-                          const yellowScore = (data.yellow * 100) / teamEffectivenessResponseCount;
-                          const redScore = ((data.red * 100) / teamEffectivenessResponseCount);
-                          return (
-                            <li className='chart-question-block' key={index}>
-                              <div className='chart-question'>
-                                <i className={getQuestionFontAwesomeClass(data.questionId)} /> &nbsp;
-                                {getQuestionShortName(data.questionId)}
-                              </div>
-                              {data.red > 0 &&
-                                <div
-                                  className='red-chart-response chart-response'
-                                  style={{ width: `${redScore}%` }}
-                                  title={`Unfavorable percentage is ${redScore}%`}
-                                  aria-label={`Unfavorable percentage is ${redScore}%`}
-                                >
-                                  {this.percentageFormatter(redScore)}
-                                </div>
-                              }
-                              {data.yellow > 0 &&
-                                <div
-                                  className='yellow-chart-response chart-response'
-                                  style={{ width: `${yellowScore}%` }}
-                                  title={`Neutral percentage is ${yellowScore}%`}
-                                  aria-label={`Neutral percentage is ${yellowScore}%`}
-                                >
-                                  {this.percentageFormatter(yellowScore)}
-                                </div>
-                              }
-                              {data.green > 0 &&
-                                <div
-                                  className='green-chart-response chart-response'
-                                  style={{ width: `${greenScore}%` }}
-                                  title={`Favorable percentage is ${greenScore}%`}
-                                  aria-label={`Favorable percentage is ${greenScore}%`}
-                                >
-                                  {this.percentageFormatter(greenScore)}
-                                </div>
-                              }
-                              {averageScore > 0 &&
-                                <div className="team-effectiveness-average-number"
-                                  aria-label={`The average score for this question is ${this.numberFormatter(averageScore)}`}>
-                                  {this.numberFormatter(averageScore)}
-                                </div>
-                              }
-                            </li>
-                          )
-                        })
-                        }
-                      </ul>
-                      <div className="chart-legend-section">
-                        <div className='chart-legend-group'>
-                          <section >
-                            <div style={{ backgroundColor: "#d6201f" }}></div>
-                            <span>Unfavorable</span>
-                          </section>
-                          <section>
-                            <div style={{ backgroundColor: "#ffd302" }}></div>
-                            <span>Neutral</span>
-                          </section>
-                          <section>
-                            <div style={{ backgroundColor: "#006b3d" }}></div>
-                            <span>Favorable</span>
-                          </section>
-                        </div>
-                        <span className='favorability-header'>Favorability</span>
-                      </div>
-                    </div>
+        <svg width="100%" height="100%">
+          <Group top={10} left={10}>
+            <BarStackHorizontal
+              data={this.state.effectivenessMeasurementChartData}
+              keys={this.state.effectivenessMeasurementChartData.map(d => d.questionId)}
+              y={d => d.questionId}
+              xScale={scaleLinear<any>()}
+              yScale={scaleBand({
+                domain: this.state.effectivenessMeasurementChartData.map(d => d.questionId),
+                padding: 0.2
+              }).rangeRound([100, 0])}
+              color={scaleOrdinal({
+                domain: this.state.effectivenessMeasurementChartData.map(d => d.questionId),
+                range: ["#6c5efb", "#c998ff", "#a44afe"]
+              })}
+            >
+              {(barStacks) =>
+                barStacks.map((barStack) =>
+                  barStack.bars.map((bar) => (
+                    <rect
+                      key={`barstack-horizontal-${barStack.index}-${bar.index}`}
+                      x={bar.x}
+                      y={bar.y}
+                      width={bar.width}
+                      height={bar.height}
+                      fill={bar.color}
+                    />
+                  )),
+                )
+              }
+            </BarStackHorizontal>
+            <AxisLeft
+              hideAxisLine
+              hideTicks
+              scale={scaleBand({
+                domain: this.state.effectivenessMeasurementChartData.map(d => d.questionId),
+                padding: 0.2
+              })}
+              //tickFormat={formatDate}
+              stroke={"#a44afe"}
+              tickStroke={"#a44afe"}
+              tickLabelProps={() => ({
+                fill: "#a44afe",
+                fontSize: 11,
+                textAnchor: 'end',
+                dy: '0.33em',
+              })}
+            />
+            <AxisBottom
+              top={10}
+              scale={scaleBand({
+                domain: this.state.effectivenessMeasurementChartData.map(d => d.questionId),
+                padding: 0.2
+              })}
+              stroke={"#a44afe"}
+              tickStroke={"#a44afe"}
+              tickLabelProps={() => ({
+                fill: "#a44afe",
+                fontSize: 11,
+                textAnchor: 'middle',
+              })}
+            />
+          </Group>
+        </svg>
+        <div
+          style={{
+            position: 'absolute',
+            top: 5,
+            width: '100%',
+            display: 'flex',
+            justifyContent: 'center',
+            fontSize: '14px',
+          }}
+        >
+          <LegendOrdinal scale={scaleOrdinal({
+                domain: this.state.effectivenessMeasurementChartData.map(d => d.questionId),
+                range: ["#6c5efb", "#c998ff", "#a44afe"]
+              })} direction="row" labelMargin="0 15px 0 0" />
+        </div>
                   </div>
                 </section>
               }
